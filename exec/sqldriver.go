@@ -216,9 +216,9 @@ func (m *qlbStmt) Query(args []driver.Value) (driver.Rows, error) {
 	// TODO:   this can't run in parallel-buffered mode?
 	// how to open in go-routine and still be able to send error to rows?
 	go func() {
-		//u.Debugf("Start Job.Run")
+		u.Debugf("Start Job.Run")
 		err = job.Run()
-		//u.Debugf("After job.Run()")
+		u.Debugf("After job.Run()")
 		if err != nil {
 			u.Errorf("error on Query.Run(): %v", err)
 			//resultWriter.ErrChan() <- err

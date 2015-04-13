@@ -107,9 +107,9 @@ func SetupTasks(tasks Tasks) error {
 		tasks[i].MessageInSet(tasks[i-1].MessageOut())
 	}
 
-	// for i, task := range tasks {
-	// 	u.Infof("set message in: %v %T  in:%p out:%p", i, task, task.MessageIn(), task.MessageOut())
-	// }
+	for i, task := range tasks {
+		u.Infof("set message in: %v %T  in:%p out:%p", i, task, task.MessageIn(), task.MessageOut())
+	}
 
 	return nil
 }
@@ -128,8 +128,9 @@ func RunJob(conf *datasource.RuntimeConfig, tasks Tasks) error {
 	for i := len(tasks) - 1; i >= 0; i-- {
 		wg.Add(1)
 		go func(taskId int) {
+			u.Warnf("starting taskId: %v %T", taskId, tasks[taskId])
 			tasks[taskId].Run(ctx)
-			//u.Warnf("exiting taskId: %v %T", taskId, tasks[taskId])
+			u.Warnf("exiting taskId: %v %T", taskId, tasks[taskId])
 			wg.Done()
 		}(i)
 	}

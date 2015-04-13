@@ -63,15 +63,18 @@ func (m *ResultBuffer) Close() error        { return nil }
 func (m *ResultWriter) Next(dest []driver.Value) error {
 	select {
 	case <-m.SigChan():
+		u.Warnf("shutting down?")
 		return ShuttingDownError
 	case err := <-m.ErrChan():
+		u.Warnf("error?")
 		return err
 	case msg, ok := <-m.MessageIn():
 		if !ok {
+			u.Warnf("shut down?")
 			return io.EOF
 		}
 		if msg == nil {
-			u.Warnf("nil message?")
+			u.Warnf("nil message?  %#v", msg)
 			return io.EOF
 			//return fmt.Errorf("Nil message error?")
 		}

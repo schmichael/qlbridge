@@ -281,7 +281,7 @@ func (m *SourceJoin) Run(context *Context) error {
 				return
 			case msg, ok := <-leftIn:
 				if !ok {
-					//u.Warnf("NICE, got left shutdown")
+					u.Warnf("NICE, got left shutdown")
 					wg.Done()
 					return
 				} else {
@@ -308,12 +308,12 @@ func (m *SourceJoin) Run(context *Context) error {
 				return
 			case msg, ok := <-rightIn:
 				if !ok {
-					//u.Warnf("NICE, got right shutdown")
+					u.Warnf("NICE, got right shutdown")
 					wg.Done()
 					return
 				} else {
 					if jv, ok := joinValue(nil, rhExpr, msg, rcols); ok {
-						//u.Debugf("right val:%v     %#v", jv, msg.Body())
+						u.Debugf("right val:%v     %#v", jv, msg.Body())
 						rh[jv] = append(rh[jv], msg)
 					} else {
 						u.Warnf("Could not evaluate? %v msg=%v", rhExpr.String(), msg.Body())
@@ -324,13 +324,14 @@ func (m *SourceJoin) Run(context *Context) error {
 		}
 	}()
 	wg.Wait()
-	//u.Info("leaving source scanner")
+	u.Info("leaving source scanner")
 	i := uint64(0)
 	for keyLeft, valLeft := range lh {
 		if valRight, ok := rh[keyLeft]; ok {
 			//u.Infof("found match?\n\t%d left=%v\n\t%d right=%v", len(valLeft), valLeft, len(valRight), valRight)
 			msgs := mergeValuesMsgs(valLeft, valRight, m.leftStmt.Columns, m.rightStmt.Columns, nil)
 			for _, msg := range msgs {
+				u.Infof("msg:  %#v", msg)
 				//outCh <- datasource.NewUrlValuesMsg(i, msg)
 				msg.Id = i
 				i++
@@ -433,16 +434,54 @@ func mergeValuesMsgs(lmsgs, rmsgs []datasource.Message, lcols, rcols []*expr.Col
 					u.Debugf("newMsg:  %#v", newMsg.Vals)
 					out = append(out, newMsg)
 				default:
-					u.Warnf("uknown type: %T", rm)
+					u.Warnf("unknown type: %T", rm)
 				}
 			}
+		case *datasource.UrlValuesMsg:
+			if uv, ok := lmt.Body().(*datasource.ContextUrlValues); ok {
+				u.Warnf("got UrlValuesMsg message: %v   %#v", len(rmsgs), lmt.Body())
+				for _, rm := range rmsgs {
+					switch rmt := rm.Body().(type) {
+					case *datasource.SqlDriverMessage:
+						newMsg := datasource.NewSqlDriverMessageMap()
+						newMsg = reAlias3(newMsg, uv, lcols, cols)
+						newMsg = reAlias2(newMsg, rmt.Vals, rcols)
+						//u.Debugf("pre:  %#v", lmt.Vals)
+						u.Debugf("post:  %#v", newMsg.Vals)
+						out = append(out, newMsg)
+					case *datasource.ContextUrlValues:
+						newMsg := mergeUv2(uv, rmt, cols)
+						u.Debugf("post:  %#v", newMsg)
+						out = append(out, newMsg)
+					default:
+						u.Warnf("unknown type: %T", rm)
+					}
+				}
+			} else {
+				u.Warnf("unknown type: %T   %#v", lmt.Body(), lmt.Body())
+			}
+
 		default:
-			u.Warnf("uknown type: %T   %T", lmt, lm)
+			u.Warnf("unknown type: %T   %T", lmt, lm)
 		}
 	}
 	return out
 }
 
+func mergeUv2(m1, m2 *datasource.ContextUrlValues, cols map[string]*expr.Column) *datasource.SqlDriverMessageMap {
+	m3 := datasource.NewContextUrlValues(m1.Data)
+	for k, val := range m2.Data {
+		//u.Debugf("k=%v v=%v", k, val)
+		m3.Data[k] = val
+	}
+	out := datasource.NewSqlDriverMessageMap()
+	for k, vals := range m3.Data {
+		if len(vals) > 0 {
+			out.Vals[k] = vals[0]
+		}
+	}
+	return out
+}
 func mergeUv(m1, m2 *datasource.ContextUrlValues) *datasource.ContextUrlValues {
 	out := datasource.NewContextUrlValues(m1.Data)
 	for k, val := range m2.Data {
@@ -471,6 +510,16 @@ func reAlias2(m *datasource.SqlDriverMessageMap, vals []driver.Value, cols []*ex
 		col := cols[i]
 		u.Infof("found: i=%v as=%v   val=%v", i, col.As, val)
 		m.Vals[col.As] = val
+	}
+	return m
+}
+
+func reAlias3(m *datasource.SqlDriverMessageMap, uv *datasource.ContextUrlValues, lcols []*expr.Column, cols map[string]*expr.Column) *datasource.SqlDriverMessageMap {
+	for k, val := range uv.Data {
+		if col, ok := cols[k]; ok {
+			u.Infof("found: k=%v as=%v   val=%v", k, col.As, val)
+			m.Vals[col.As] = val
+		}
 	}
 	return m
 }

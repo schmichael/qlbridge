@@ -48,6 +48,23 @@ func NewSqlDriverMessageMap() *SqlDriverMessageMap {
 func (m *SqlDriverMessageMap) Key() uint64       { return m.Id }
 func (m *SqlDriverMessageMap) Body() interface{} { return m.Vals }
 
+func (m *SqlDriverMessageMap) Get(key string) (value.Value, bool) {
+	if val, ok := m.Vals[key]; ok {
+		return value.NewValue(val), true
+	} else {
+		u.Warnf("could not find key: %v", key)
+	}
+	return value.ErrValue, false
+}
+func (m *SqlDriverMessageMap) Row() map[string]value.Value {
+	row := make(map[string]value.Value)
+	for k, val := range m.Vals {
+		row[k] = value.NewValue(val)
+	}
+	return row
+}
+func (m *SqlDriverMessageMap) Ts() time.Time { return time.Time{} }
+
 type ValueContextWrapper struct {
 	*SqlDriverMessage
 	cols map[string]*expr.Column
