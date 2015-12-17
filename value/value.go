@@ -539,6 +539,12 @@ func (m MapValue) MapString() map[string]string {
 	return mv
 }
 
+// Get retrieves a value from the map or returns false.
+func (m MapValue) Get(key string) (Value, bool) {
+	v, ok := m.v[key]
+	return v, ok
+}
+
 func NewMapStringValue(v map[string]string) MapStringValue {
 	return MapStringValue{v: v, rv: reflect.ValueOf(v)}
 }
